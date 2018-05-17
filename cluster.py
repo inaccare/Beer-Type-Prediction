@@ -13,8 +13,7 @@ def average_vecs(w2v):
 	tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
 	with open('beers.csv') as f:
 		df = pd.read_csv(f)
-		styles = df['style'].unique()
-		print(styles)
+		styles = df['style'].unique()[:-1]
 		all_styles = np.zeros((89, 100))
 		for i, s in enumerate(styles):
 			all_beers = df.loc[df['style'] == s]
@@ -29,19 +28,25 @@ def average_vecs(w2v):
 						summed += w2v[token]
 			summed /= num_rows
 			all_styles[i] = summed
-		return all_styles
+		return all_styles, styles
 
 def cluster(all_styles):
 	kmeans = KMeans()
 	kmeans.fit(all_styles)
-	print(kmeans.labels_)
+	return kmeans.labels_
 
 
 def main():
 	w2vFile = sys.argv[1]
 	w2v = gensim.models.word2vec.Word2Vec.load(w2vFile)
-	all_styles = average_vecs(w2v)
-	cluster(all_styles)
+	all_styles, styles = average_vecs(w2v)
+	labels = cluster(all_styles)
+	clusters = {}
+	for i in range(8):
+		clusters[i] = []
+	for j in range(len(labels)):
+			clusters[labels[j]].append(styles[j])
+	print(clusters)
 
 
 
