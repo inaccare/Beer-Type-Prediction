@@ -3,14 +3,14 @@ import pandas as pd
 data_path = '../ratebeer.txt'
 
 def main():
-	with open(data_path, 'r') as f:
+	with open(data_path, encoding='utf-8') as f:
 		reviews = f.read().split('\n\n')
 		parsed_data = []
 		categories = set()
 		num_reviews = len(reviews)
 		for num, r in enumerate(reviews):
 			if num % 10000 == 0:
-				print str(num) + '/' + str(num_reviews)
+				print(str(num) + '/' + str(num_reviews))
 			datum = []
 			feats = r.split('\n')
 			for i, feat in enumerate(feats):
@@ -30,7 +30,7 @@ def main():
 
 		with open('beers.csv', 'w') as out:
 		    df.to_csv(out)
-		print 'Total number of categories: ' + str(len(categories))
+		print('Total number of categories: ' + str(len(categories)))
 
 
 main()
