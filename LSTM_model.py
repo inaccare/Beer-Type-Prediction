@@ -4,6 +4,7 @@ import sys
 import time
 import math
 import numpy as np
+np.set_printoptions(threshold=np.nan)
 import h5py
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -13,6 +14,7 @@ import nltk
 import multiprocessing
 import gensim
 from collections import defaultdict
+import codecs
 
 
 """
@@ -33,8 +35,6 @@ for w in w2v.wv.vocab:
     indexToEmb[count] = w2v.wv[w]
     count = count + 1
 
-styleToIndex = dict()
-
 def main():
     # Usage is as follows: python model.py <train>.csv <dev>.csv <glove file> 
     X_test = []
@@ -46,19 +46,19 @@ def main():
         trainCSV = sys.argv[1]
     if (len(sys.argv) >= 4):
         devCSV = sys.argv[2]
-    lr, ne, bs, tx = None, None, None, 72
+    lr, ne, bs, tx = None, None, None, 400
     if (len(sys.argv) >= 5):
         lr, ne, bs, tx = getHyperparamsFromJSON(str(sys.argv[4]))
 
     styleToIndex = buildStyleIndices()
     trainDF = pd.read_csv(trainCSV, header = 0, encoding='cp1252')
-    trainDF = trainDF.truncate(before = 0, after = 10000)
+    trainDF = trainDF.truncate(before = 0, after = 500000)
     # For each entry in X_train, we have an array of length T_x with each entry
     # corresponding to an index into the word's w2v embedding
-    X_train, Y_train = getProductIndicesAndPrices(trainDF, tx, styleToIndex)
+    X_train, Y_train = getReviewIndicesAndStyles(trainDF, tx, styleToIndex)
     devDF = pd.read_csv(devCSV, header = 0, encoding='cp1252')
-    devDF = devDF.truncate(before = 0, after = 1000)
-    X_dev, Y_dev = getProductIndicesAndPrices(devDF, tx, styleToIndex)
+    devDF = devDF.truncate(before = 0, after = 50000)
+    X_dev, Y_dev = getReviewIndicesAndStyles(devDF, tx, styleToIndex)
     print ("X_train shape: " + str(X_train.shape))
     print ("Y_train shape: " + str(Y_train.shape))
     print ("X_dev shape: " + str(X_dev.shape))
@@ -69,14 +69,25 @@ def main():
         model(X_train, Y_train, X_dev, Y_dev, learning_rate = lr, num_epochs = ne, mini_batch_size = bs, Tx = tx)
 
 def buildStyleIndices():
-    df = pd.read_csv("beers.csv", header = 0, encoding='cp1252')
+    styleDict = {}
+    df = pd.read_csv("beers_train.csv", header = 0, encoding='cp1252')
     styles = df['style'].unique()[:-1]
-    styleDict = defaultdict(int)
     for i, s in enumerate(styles):
-        styleDict[str(s)] = i
+        if str(s) not in styleDict:
+            styleDict[str(s)] = i
     return styleDict
 
-def getProductIndicesAndPrices(df, T_x, styleToIndex):
+def cleanStyles(styles):
+    new_styles = []
+    for s in styles:
+        string_nobackslashes = codecs.decode(s, 'unicode_escape')
+        string_nobackslashes = string_nobackslashes.encode('ISO-8859-1')
+        correct_string = string_nobackslashes.replace(b'\xc3\xa9', 'e').replace(b'\xc3\xb6', 'o').replace(b'&#40;IPA&#41;', '').replace(b'&#40;Witbier&#41;', '').replace('\xc3\xa4', 'a').replace(b'\xc3\xa8', 'e').replace('b\'', '').replace('\'', '').strip()
+        correct_string = correct_string.decode('ascii')
+        new_styles.append(correct_string)
+    return new_styles
+
+def getReviewIndicesAndStyles(df, T_x, styleToIndex):
     X = []
     Y = []
     numBuckets = 89
@@ -86,7 +97,7 @@ def getProductIndicesAndPrices(df, T_x, styleToIndex):
         else:
             X.append(np.zeros(T_x))
         Y.append(OneHot(styleToIndex[str(df['style'][i])], 89))
-    Y= np.array(Y).T
+    Y = np.array(Y).T
     X = np.array(X).T
     return X, Y
 
@@ -95,7 +106,7 @@ def getIndexArrForSentence(sentence, T_x):
     words = nltk.word_tokenize(sentence.lower())
     count = 0
     for w in words:
-        # Only looking at first 72 words!
+        # Only looking at first 400 words!
         if (count == T_x):
             break
         if w in w2v.wv.vocab:
@@ -119,8 +130,8 @@ def OneHot(bucket, numBuckets):
 # ==========
 #   MODEL
 # ==========
-def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
-        mini_batch_size = 128, Tx = 72, display_step = 1, n_hidden = 64):
+def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 1,
+        mini_batch_size = 128, Tx = 400, display_step = 1, n_hidden = 64):
     # Shape of X: (m, Tx, n_x)??? Emmie please check this
     # Shape of Y: (n_y, m)
     print ("Model has following hyperparameters: learning rate: " + str(learning_rate) + ", num_epochs: " + str(num_epochs) + ", mini_batch_size: " \
@@ -157,6 +168,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
     }
 
     pred = dynamicRNN(X, Tx, weights, biases, n_x, n_hidden)
+#    pred = tf.Print(pred, [pred], message="This is pred: ", summarize=88)
     # Define loss and optimizer
     cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = pred, labels = tf.transpose(Y)))
     optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate).minimize(cost)
@@ -218,7 +230,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
             dev_num_correct = dev_num_correct + num_correct_mb
 
         print("Accuracy for dev set: "+ str(dev_num_correct/X_dev.shape[1]))
-        saver.save(sess, './model_lstm_w2v_expan_v2')
+        saver.save(sess, './LSTM_model')
         sess.close()
         # # Calculate accuracy
         # test_data = testset.data
