@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import sys
 import pylab as pl
+import codecs
 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -45,7 +46,12 @@ def main():
 	all_styles, styles = average_vecs(w2v)
 	new_styles = []
 	for s in styles:
-		new_styles.append(s.replace('\xc3\xa9', 'e'). replace('\xc3\xb6', 'o').replace('&#40;IPA&#41;', '').strip())
+		string_nobackslashes = codecs.decode(s, 'unicode_escape')
+		string_nobackslashes = string_nobackslashes.encode('ISO-8859-1')
+		correct_string = string_nobackslashes.replace(b'\xc3\xa9', 'e').replace(b'\xc3\xb6', 'o').replace(b'&#40;IPA&#41;', '').replace(b'&#40;Witbier&#41;', '').replace('\xc3\xa4', 'a').replace(b'\xc3\xa8', 'e').replace('b\'', '').replace('\'', '').strip()
+		correct_string = correct_string.decode('ascii')
+		new_styles.append(correct_string)
+	print(new_styles)
 	styles = new_styles
 	labels = cluster(all_styles)
 	clusters = {}
@@ -74,7 +80,7 @@ def main():
 		elif labels[i] == 6:
 			c7 = pl.scatter(pca_2d[i,0], pca_2d[i,1], c='k')
 		elif labels[i] == 7:
-			c8 = pl.scatter(pca_2d[i,0], pca_2d[i,1], c='darkviolet')
+			c8 = pl.scatter(pca_2d[i,0], pca_2d[i,1], c='orange')
 		pl.annotate(styles[i], xy=(pca_2d[i,0], pca_2d[i,1]))
 	pl.legend([c1, c2, c3, c4, c5, c6, c7, c8], ['1', '2', '3', '4', '5', '6', '7', '8'])
 	pl.show()

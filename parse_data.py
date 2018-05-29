@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 
-data_path = './ratebeer.txt'
+data_path = '../ratebeer.txt'
 
 def main():
-	with open(data_path, encoding='cp1252') as f:
+	with open(data_path, encoding='utf-8') as f:
 		reviews = f.read().split('\n\n')
 		parsed_data = []
 		categories = set()
