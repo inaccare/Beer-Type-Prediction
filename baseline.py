@@ -15,12 +15,15 @@ def average_vecs(w2v, filename):
 	with open(filename) as f:
 		df = pd.read_csv(f, dtype={'text': str})
 		samples = []
-		labels = df['style']
+		labels = []
 		reviews = df['text']
 		num_rows = len(df)
-		for i, review in enumerate(reviews.iloc[:-1]):
+		for i, review in enumerate(reviews):
+			if i % 1000 == 0:
+				print str(i) + '/' + str(num_rows)
 			if type(review) is not str:
 				continue
+			labels.append(df.iloc[i]['style'])
 			summed = np.zeros((100))
 			review_tokenized = nltk.word_tokenize(review.lower())
 			for token in review_tokenized:
@@ -48,7 +51,7 @@ def main():
 		if dev_y[i] == y_hat[i]:
 			correct += 1
 	acc = correct / total
-	print 'accuracy: ' + acc
+	print 'accuracy: ' + str(acc)
 
 
 
